@@ -8,3 +8,19 @@ const PORT = process.env.PORT || 9002
 dotenv.config({ path: "././config.env" })
 app.use(cookieParser())
 app.use(express.json())
+
+var cors = require('cors')
+const origin = ["http://localhost:3000"]
+app.use(cors({
+    credentials: true,
+    origin: origin,
+    methods: ["GET", "POST"],
+    preflightContinue: true,
+}));
+
+app.use(require('./router/auth'))
+
+
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Be Started at port ${process.env.PORT}`)
+})
