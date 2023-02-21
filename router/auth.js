@@ -48,7 +48,9 @@ router.post("/login", (req, res) => {
         }
     })
 })
-
+router.get("/demo",(req,res)=>{
+    res.send("hii this is res")
+})
 router.post("/register", (req, res) => {
     console.log(req.body)
 
