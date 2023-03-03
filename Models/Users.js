@@ -2,7 +2,7 @@ const mongoose = require("mongoose")
 const bcrypt = require("bcryptjs")
 const jwt = require('jsonwebtoken')
 const Infouser = new mongoose.Schema({
-    image:{
+    image: {
         type: String,
     },
     name: {
@@ -22,11 +22,11 @@ const Infouser = new mongoose.Schema({
         required: true,
         unique: true
     },
-    role:{
+    role: {
         type: String,
         required: true,
     },
-    location:{
+    location: {
         type: String,
         required: true,
     },
@@ -35,10 +35,15 @@ const Infouser = new mongoose.Schema({
         required: true,
         minlength: [8, "Password must be Greater than 8 characters"]
     },
-    confirmpassword:{
-        type:String,
-        require:true
+    confirmpassword: {
+        type: String,
+        require: true
     },
+    teams: [
+        {
+            type: mongoose.Schema.Types.Mixed,
+        }
+    ],
     tokens: [
         {
             token: {

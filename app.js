@@ -10,7 +10,7 @@ app.use(cookieParser())
 app.use(express.json())
 
 var cors = require('cors')
-const origin = ["https://inquisitive-cocada-be43aa.netlify.app","http://localhost:3000"]
+const origin = ["https://inquisitive-cocada-be43aa.netlify.app/","http://localhost:3000"]
 app.use(cors({
     credentials: true,
     origin: origin,
