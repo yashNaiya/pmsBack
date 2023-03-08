@@ -19,6 +19,7 @@ const storage = multer.diskStorage({
 var upload = multer({ storage: storage })
 
 const path = require("path");
+const { EOF } = require('dns');
 
 const transporter = nodemailer.createTransport({
     service: "gmail",
@@ -61,44 +62,87 @@ router.post("/login", (req, res) => {
 router.get("/demo", (req, res) => {
     res.send("hii this is res")
 })
-router.post("/register", (req, res) => {
-    console.log(req.body)
-
+router.post("/register", async (req, res) => {
+    // console.log(req.body)
     const { name, email, password, number, role, location } = req.body
 
-    User.findOne({ email: email }, (err, user) => {
-        if (user) {
-            res.send({ message: "User Already Registered" })
-        } else {
-            const user = new User({
-                image: "",
-                name: name[0],
-                number: number[0],
-                email: email[0],
-                role: role[0],
-                location: location[0],
-                password: password[0],
-            })
-            user.save(async (err) => {
-                if (err) {
-                    console.log(err)
-                    console.log("Hello")
-                    res.send(err)
-                }
-                else {
-                    res.status(200).send({ message: "Successfully Registration" })
-                    token = await user.generateAuthToken();
-                    res.cookie("jwtoken", token, {
-                        expires: new Date(Date.now() + 864000000),
-                        httpOnly: true,
-                        secure: true,
-                        sameSite: 'none'
-                    }).send()
-                }
-            })
-        }
+    const users = await User.find()
+    console.log(users)
+    if (!users.length) {
+        const type = 0
 
-    })
+        User.findOne({ email: email }, (err, user) => {
+            if (user) {
+                res.send({ message: "User Already Registered" })
+            } else {
+                const user = new User({
+                    image: "",
+                    name: name[0],
+                    number: number[0],
+                    email: email[0],
+                    type: type,
+                    role: role[0],
+                    location: location[0],
+                    password: password[0],
+                })
+                user.save(async (err) => {
+                    if (err) {
+                        console.log(err)
+                        console.log("Hello")
+                        res.send(err)
+                    }
+                    else {
+                        res.status(200).send({ message: "Successfully Registration" })
+                        token = await user.generateAuthToken();
+                        res.cookie("jwtoken", token, {
+                            expires: new Date(Date.now() + 864000000),
+                            httpOnly: true,
+                            secure: true,
+                            sameSite: 'none'
+                        }).send()
+                    }
+                })
+            }
+
+        })
+    } else {
+        User.findOne({ email: email }, (err, user) => {
+            if (user) {
+                res.send({ message: "User Already Registered" })
+            } else {
+                const user = new User({
+                    image: "",
+                    name: name[0],
+                    number: number[0],
+                    email: email[0],
+                    role: role[0],
+                    location: location[0],
+                    password: password[0],
+                })
+                user.save(async (err) => {
+                    if (err) {
+                        console.log(err)
+                        console.log("Hello")
+                        res.send(err)
+                    }
+                    else {
+                        res.status(200).send({ message: "Successfully Registration" })
+                        token = await user.generateAuthToken();
+                        res.cookie("jwtoken", token, {
+                            expires: new Date(Date.now() + 864000000),
+                            httpOnly: true,
+                            secure: true,
+                            sameSite: 'none'
+                        }).send()
+                    }
+                })
+            }
+
+        })
+    }
+
+
+
     // res.send('my register api')
 })
 
@@ -201,44 +245,64 @@ router.post('/users', async (req, res) => {
 })
 
 router.post('/createteam', async (req, res) => {
-    const admin = {
-        _id: mongoose.Types.ObjectId(req.body.rootUser._id),
-        name: req.body.rootUser.name,
-        number: req.body.rootUser.number,
-        role: req.body.rootUser.role
+
+    const teamExists = await Team.find({name:req.body.teamName})
+    if(teamExists){
+        res.send({message:"Team of same name already exists"})
     }
-    const array = req.body.personName
-    let members = [admin]
-    try {
-        for (obj of array) {
-            const temp = await User.findOne({ name: obj }, { name: true, _id: true, number: true, role: true })
-            if (temp) {
-                console.log(temp)
-                members.push(temp)
-                //adding team name to user object
-
-                const addedTeam = await User.findOneAndUpdate({ _id: temp._id }, { $push: { teams: req.body.teamName } })
-            }
+    else{
+        
+        const admin = {
+            _id: mongoose.Types.ObjectId(req.body.rootUser._id),
+            name: req.body.rootUser.name,
+            number: req.body.rootUser.number,
+            role: req.body.rootUser.role
         }
-        const addedTeam = await User.findOneAndUpdate({ _id: admin._id }, { $push: { teams: req.body.teamName } })
-
-        console.log(members)
-        const team = new Team({
-            name: req.body.teamName,
-            admin: admin,
-            members: members
-        })
-        team.save(async (err) => {
-            if (err) {
-                console.log(err)
-                res.send(err)
+        const array = req.body.personName
+        let members = [admin]
+        try {
+            for (obj of array) {
+                const temp = await User.findOne({ name: obj }, { name: true, _id: true, number: true, role: true })
+                if (temp) {
+                    console.log(temp)
+                    members.push(temp)
+                    //adding team name to user object
+    
+                    const addedTeam = await User.findOneAndUpdate({ _id: temp._id }, { $push: { teams: req.body.teamName } })
+                }
             }
-            else {
-                res.status(200).send({ message: "Successfull Team Registration" })
+            const addedTeam = await User.findOneAndUpdate({ _id: admin._id }, { $push: { teams: req.body.teamName } })
+    
+            console.log(members)
+          
+            const isAdmin = req.body.rootUser.type
+            let team = {}
+            if (isAdmin === 0) {
+                team = new Team({
+                    name: req.body.teamName,
+                    admin: admin,
+                    state: true,
+                    members: members
+                })
+            } else {
+                team = new Team({
+                    name: req.body.teamName,
+                    admin: admin,
+                    members: members
+                })
             }
-        })
-    } catch (e) {
-        console.log(e.message)
+            team.save(async (err) => {
+                if (err) {
+                    console.log(err)
+                    res.send(err)
+                }
+                else {
+                    res.status(200).send({ message: "Successfull Team Registration" })
+                }
+            })
+        } catch (e) {
+            console.log(e.message)
+        }
     }
 })
 
@@ -256,24 +320,35 @@ router.get('/notapprovedteams', async (req, res) => {
 
 //approve team
 
-router.post('/approveteam',async(req,res)=>{
-    const teamApproved = await Team.findOneAndUpdate({name:req.body.name},{state:true})
+router.post('/approveteam', async (req, res) => {
+    const teamApproved = await Team.findOneAndUpdate({ name: req.body.name }, { state: true })
 
-    if(teamApproved){
-        res.status(200).send({message:"team is approved for this workspace"})
-    }else{
+    if (teamApproved) {
+        res.status(200).send({ message: "team is approved for this workspace" })
+    } else {
         res.status(404).send()
     }
 })
 
 //delete team
-router.post('/deleteteam',async(req,res)=>{
-    const teamDeleted = await Team.findOneAndDelete({name:req.body.name})
+router.post('/deleteteam', async (req, res) => {
 
-    if(teamDeleted){
-        res.status(200).send({message:"team is deleted for this workspace"})
-    }else{
-        res.status(404).send()
+    if (req.body.team.admin._id === req.body.rootUser._id) {
+        const action = {
+            name: req.body.team,
+            action: 'delete',
+            by: req.body.rootUser,
+            metadata: `Team Deletion`
+        }
+        const teamDeleted = await Team.findOneAndUpdate({ name: req.body.team.name }, { $push: { action: action } })
+
+        if (teamDeleted) {
+            res.status(200).send({ message: "team is deleted for this workspace" })
+        } else {
+            res.status(404).send()
+        }
+    } else {
+        res.send({ message: "you are not authorized to change the team name" })
     }
 })
 
@@ -290,14 +365,14 @@ router.post('/readteam', async (req, res) => {
 })
 //my teams api
 
-router.post('/myteams',async(req,res)=>{
+router.post('/myteams', async (req, res) => {
 
     const array = req.body.rootUser.teams
     let teams = []
-    
-    for(obj of array){
-        const tempteam = await Team.findOne({name:obj})
-        if(tempteam){
+    // console.log(array)
+    for (obj of array) {
+        const tempteam = await Team.findOne({ name: obj })
+        if (tempteam) {
             teams.push(tempteam)
         }
     }
@@ -313,40 +388,172 @@ router.get('/allteams', async (req, res) => {
 })
 
 //team name change api
-router.post('/renameteam',async(req,res)=>{
-    const newnameset = await Team.findOneAndUpdate({name:req.body.name},{$set:{name:req.body.newname}})
-    if(newnameset){
-        res.send({message:"name is updated"})
+
+router.get('/actionnotapproved', async (req, res) => {
+    const teams = await Team.find({ 'action.0': { $exists: true } })
+    let array = []
+    for (val of teams) {
+        // console.log(val.action)
+        // array.push(val.action[0])
+        for (act of val.action) {
+            array.push(act)
+        }
+    }
+    // console.log(array)
+    res.send(array)
+})
+router.post('/renameteam', async (req, res) => {
+
+    if (req.body.team.admin._id === req.body.rootUser._id) {
+
+        const action = {
+            name: req.body.team,
+            action: 'rename',
+            by: req.body.rootUser,
+            metadata: `${req.body.team.name} to ${req.body.newname}`
+        }
+
+        const newnameset = await Team.findOneAndUpdate({ name: req.body.team.name }, { $push: { action: action } })
+        if (newnameset) {
+            res.send({ message: "name is updated" })
+        }
+    } else {
+        res.send({ message: "you are not authorized to change the team name" })
+
     }
 })
 
 //remove from team
 
-router.post('/reomvefromteam',async(req,res)=>{
-    console.log(req.body.user[0])
-    console.log(req.body.team._id)
-    const findTeam = await Team.updateOne({_id:req.body.team._id},{$pull:{members:{name:req.body.user[0]}}})
-    if(findTeam){
-        const removedfromuser = await User.updateOne({name:req.body.user[0]},{$pull:{teams:req.body.team.name}})
-        res.send({message:"user is removed from the team"})
+router.post('/reomvefromteam', async (req, res) => {
+    // console.log(req.body.user[0])
+    // console.log(req.body.team)
+    // console.log(req.body.rootUser.name)
+    if (req.body.team.admin._id === req.body.rootUser._id) {
+        if(req.body.rootUser.name === req.body.user[0] ){
+            res.send({message:"Admin can not be removed from the team"})
+        }else{
+            const action = {
+                name: req.body.team,
+                action: 'remove from team',
+                by: req.body.rootUser,
+                metadata: `${req.body.user[0]}`
+            }
+            const remove = await Team.findOneAndUpdate({ name: req.body.team.name }, { $push: { action: action } })
+        }
     }
+    else {
+        res.send({ message: "you are not authorized to change the team name" })
+    }
+
 })
 
 
 //add to team
 
-
-router.post('/addusers',async(req,res)=>{
+router.post('/addusers', async (req, res) => {
+    const name = []
     const data = req.body.users
+    for (val of data) {
+        name.push(' ' + val.name)
+    }
+    let flag = 0
     const team = req.body.team
-    // console.log(team)
-    for(val of data){
-        // console.log(val)
-        const update =await Team.updateOne({_id:team._id},{$push:{members:{_id:val._id,name:val.name,number:val.number,role:val.role}}})
-        if(update){
-            const userupdate = await User.updateOne({_id:val._id},{$push:{teams:team.name}})
+    for(val of name){
+        for(member of team.members){
+            if(val.trim()===member.name){
+                flag=1
+            }
         }
     }
-    res.send({message:"team members are updated"})
+    if(flag){
+        res.send({message:"user already exists in a team"})
+    }else{
+
+        if (req.body.team.admin._id === req.body.rootUser._id) {
+            const action = {
+                name: req.body.team,
+                action: 'add user',
+                by: req.body.rootUser,
+                metadata: name
+            }
+            
+            const remove = await Team.findOneAndUpdate({ name: req.body.team.name }, { $push: { action: action } })
+        } 
+        else {
+            res.send({ message: "you are not authorized to change the team name" })
+        }
+        console.log(data)
+        for(val of data){
+            // console.log(val)
+            const update =await Team.updateOne({_id:team._id},{$push:{members:{_id:val._id,name:val.name,number:val.number,role:val.role}}})
+            if(update){
+                const userupdate = await User.updateOne({_id:val._id},{$push:{teams:team.name}})
+            }
+        }
+        res.send({message:"team members are updated"})
+    }
 })
+
+router.post('/rejectaction',async(req,res)=>{
+    const {data} = req.body
+    const update = await Team.updateOne({ _id: data[0]._id }, { $pull: { 'action': { $and: [{ 'metadata': data[3] }, { 'name': data[0] }, { 'by': data[2] }] } } })
+    res.send({message:"Request rejected"})
+})
+
+router.post('/approveaction', async (req, res) => {
+    const { data } = req.body
+    if (data[1] === 'add user') {
+  
+        for(val of data[3]){
+            const user = await User.findOne({name:val.trim()})
+            if(user){
+                console.log(user)
+                const update = await Team.updateOne({_id:data[0]._id},{$push:{members:{_id:user._id,name:user.name,number:user.number,role:user.role}}})
+                if(update){
+                    console.log(update)
+                    const userupdate = await User.updateOne({_id:user._id},{$push:{teams:data[0].name}})
+                }
+            }
+        }
+        const update = await Team.updateOne({ _id: data[0]._id }, { $pull: { 'action': { $and: [{ 'metadata': data[3] }, { 'name': data[0] }, { 'by': data[2] }] } } })
+        res.send("Team members are updated")
+    } else if (data[1] === 'remove from team') {
+        // console.log('2')
+        const findTeam = await Team.updateOne({ _id:data[0]._id }, { $pull: { members: { name: data[3] } } })
+        const removedfromuser = await User.updateOne({ name: data[3] }, { $pull: { teams: data[0] } })
+
+        if(findTeam && removedfromuser){
+            const update = await Team.updateOne({ _id: data[0]._id }, { $pull: { 'action': { $and: [{ 'metadata': data[3] }, { 'name': data[0] }, { 'by': data[2] }] } } })
+            res.send("User removed from the team")
+        }else{
+            res.send()
+        }
+
+
+    } else if (data[1] === 'rename') {
+        console.log('3')
+        console.log(data[3].split('to ').pop())
+        const renameTeam = await Team.updateOne({ _id: data[0]._id }, { $set: { name: data[3].split('to ').pop() } })
+
+        if (renameTeam) {
+            const update = await Team.updateOne({ _id: data[0]._id }, { $pull: { 'action': { $and: [{ 'metadata': data[3] }, { 'name': data[0] }, { 'by': data[2] }] } } })
+            res.send("New team name is set")
+        } else {
+            res.send()
+        }
+
+    } else if (data[1] === 'delete') {
+        // console.log('4')
+        const deleteTeam = await Team.deleteOne({ _id: data[0]._id })
+        if (deleteTeam) {
+            res.send("Team deleted")
+        } else {
+            res.send('error happened')
+        }
+    }
+})
+
 module.exports = router
+
+

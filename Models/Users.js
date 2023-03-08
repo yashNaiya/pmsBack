@@ -17,6 +17,11 @@ const Infouser = new mongoose.Schema({
         maxlength: [10, "Enter Valid Number"],
         unique: true
     },
+    type:{
+        type: Number,
+        required:true,
+        default:1
+    },
     email: {
         type: String,
         required: true,
@@ -40,6 +45,16 @@ const Infouser = new mongoose.Schema({
         require: true
     },
     teams: [
+        {
+            type: mongoose.Schema.Types.Mixed,
+        }
+    ],
+    notification:[
+        {
+            type: mongoose.Schema.Types.Mixed,
+        }
+    ],
+    work:[
         {
             type: mongoose.Schema.Types.Mixed,
         }

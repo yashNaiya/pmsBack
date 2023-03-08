@@ -8,15 +8,37 @@ const team = new mongoose.Schema({
     admin:
     {
         type: mongoose.Schema.Types.Mixed,
-        ref:"Users"
+        ref: "Users"
     },
-    state:{
-        type:Boolean,
-        default : false
+    state: {
+        type: Boolean,
+        default: false
     },
     members: [
         {
             type: mongoose.Schema.Types.Mixed,
+        }
+    ],
+    action: [
+        {
+            name:{
+                type: mongoose.Schema.Types.Mixed,
+                ref: "Teams"
+            },
+            action: {
+                type: String
+            },
+            by: {
+                type: mongoose.Schema.Types.Mixed,
+                ref: "Users"
+            },
+            users: {
+                type: mongoose.Schema.Types.Mixed,
+                ref: "Users"
+            },
+            metadata:{
+               type: mongoose.Schema.Types.Mixed,
+            }
         }
     ]
 })
