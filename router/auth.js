@@ -2,6 +2,7 @@ var mongoose = require('mongoose');
 const express = require('express')
 const User = require("../Models/Users")
 const Team = require("../Models/Teams")
+const Workspace = require("../Models/Workspaces")
 const bcrypt = require("bcryptjs")
 const router = express.Router()
 const Authenticate = require("../Middleware/Authenticate")
@@ -243,7 +244,14 @@ router.post('/users', async (req, res) => {
         res.send(e)
     }
 })
+// get user profile
 
+router.post('/readuser',async(req,res)=>{
+    console.log(req.body)
+    const user = await User.findOne({_id:req.body._id})
+    console.log(user)
+    res.send(user)
+})
 router.post('/createteam', async (req, res) => {
 
     const teamExists = await Team.find({name:req.body.teamName})
@@ -551,6 +559,141 @@ router.post('/approveaction', async (req, res) => {
         } else {
             res.send('error happened')
         }
+    }
+})
+
+//add workspace
+
+router.post('/createworkspace',async(req,res)=>{
+    console.log(req.body.name)
+    const isWorkspace =await Workspace.find({name:req.body.name})
+    console.log(isWorkspace)
+    if(!(isWorkspace.length===0)){
+        res.send({message:"workspace of same name already exists"})
+    }else{
+        const workspace = new Workspace({
+            name:req.body.name
+        })
+        workspace.save(async(err)=>{
+            if(err){
+                res.send(err)
+            }else{
+                res.send({message:"new workspace added"})
+            }
+        })
+    }
+})
+
+
+//read workspaces
+
+router.get('/readworkspaces',async(req,res)=>{
+    const workspaces = await Workspace.find({},{name:1})
+    // console.log(workspaces)
+    res.send(workspaces)
+})
+
+router.post('/currentworkspace',async(req,res)=>{
+    const data = await Workspace.findOne({_id:req.body._id})
+    if(data){
+        res.send(data)
+    }else{
+        res.send()
+    }
+})
+
+//add customer to workspace
+
+router.post('/addcustomer',async(req,res)=>{
+    try{
+        let exists = false
+        const workspace = await Workspace.findOne({_id:req.body._id})
+        const {name,location,number,website,email} = req.body.customerData
+        const client = {
+            name: name.toString(),
+            number: number.toString(),
+            email:email.toString(),
+            location:location.toString(),
+            website:website.toString()
+        }
+        for(cli of workspace.client){
+            if(name===cli.name)
+            exists = true
+            
+        }
+        if(exists){
+            res.send({message:"client with same name already exists"})
+        }else{
+            const updated = await Workspace.findByIdAndUpdate({_id:req.body._id},{$push:{client:client}})
+            if(updated){
+                console.log('updated')
+                res.send({message:"client is added to this wokspace"})
+            }
+        }
+    }catch(err){
+        console.log(err)
+        res.send(err)
+    }
+})
+
+//add project without client
+
+router.post('/addproject',async(req,res)=>{
+    try{
+
+        let exists = false
+        const workspace = await Workspace.findOne({_id:req.body._id})
+        const {info,manager,requirements} = req.body.projectData
+
+        const project = {
+            name:info.name,
+            due:info.due,
+            manager:manager,
+            requirements:requirements
+        }
+        for(pro in workspace.projects){
+            if(info.name===pro.name)
+            exists=true
+        }
+        if(exists){
+            res.send({message:"project with same name already exists"})
+        }else{
+            const updated = await Workspace.findByIdAndUpdate({_id:req.body._id},{$push:{projects:project}})
+            if(updated){
+                res.send({message:"project is added to this wokspace"})
+            }
+        }
+    }catch(err){
+        console.log(err)
+        res.send(err)
+    }
+
+})
+
+router.post('/readclients',async(req,res)=>{
+    const workspaceClients = await Workspace.findOne({_id:req.body._id},{client:1}) 
+
+    console.log(workspaceClients)
+    res.send(workspaceClients)
+})
+
+router.post('/readprojects',async(req,res)=>{
+    const workspaceProjects = await Workspace.findOne({_id:req.body._id},{projects:1}) 
+
+    console.log(workspaceProjects)
+    res.send(workspaceProjects)
+})
+
+//add group
+
+router.post('/addgroup',async(req,res)=>{
+    const {name,wsID,projectID} = req.body
+    console.log(req.body.projectID)
+
+    try{
+        const workspaceProjects = await Workspace.findOneAndUpdate({_id:wsID,'projects._id':projectID},{$push:{"projects.$.groups":{name}}}) 
+    }catch(err){
+
     }
 })
 
