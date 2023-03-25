@@ -1,6 +1,8 @@
 const mongoose = require("mongoose")
 const bcrypt = require("bcryptjs")
 const jwt = require('jsonwebtoken')
+var Schema = mongoose.Schema,
+    ObjectId = Schema.ObjectId;
 const Infouser = new mongoose.Schema({
     image: {
         type: String,
@@ -44,6 +46,11 @@ const Infouser = new mongoose.Schema({
         type: String,
         require: true
     },
+    workspaces:[
+        {
+            type: mongoose.Schema.Types.Mixed,
+        }
+    ],
     teams: [
         {
             type: mongoose.Schema.Types.Mixed,
