@@ -27,8 +27,7 @@ const project = new mongoose.Schema({
         type: String
     },
     members: [{
-        type: mongoose.Schema.Types.Mixed,
-        ref: "Users"
+        type:ObjectId
     }],
     groups: [
         {

@@ -22,19 +22,19 @@ const client = new mongoose.Schema({
         type: String
     },
     contacts: [{
-        contactname: {
+        name: {
             type: String,
             required: true
         },
-        contactemail: {
+        number: {
             type: String,
             required: true
         },
-        contactnumber: {
+        email: {
             type: String,
             required: true
         },
-        contactdesignation: {
+        designation: {
             type: String,
             required: true
         }

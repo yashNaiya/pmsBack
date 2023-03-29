@@ -1,5 +1,6 @@
 const mongoose = require("mongoose")
-
+var Schema = mongoose.Schema,
+    ObjectId = Schema.ObjectId;
 const team = new mongoose.Schema({
     name: {
         type: String,
@@ -9,6 +10,9 @@ const team = new mongoose.Schema({
     {
         type: mongoose.Schema.Types.Mixed,
         ref: "Users"
+    },
+    workspace:{
+        type: Object,
     },
     state: {
         type: Boolean,

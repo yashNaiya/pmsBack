@@ -89,10 +89,10 @@ router.post("/register", async (req, res) => {
                 res.send(err)
             }
             else {
-                if(req.body._id){
-                    const tempuser = await User.findOne({email:email},{_id:1})
-                    const adduser = await Workspace.findOneAndUpdate({_id:req.body._id},{$push:{members:tempuser}})
-                    const addworkspace = await User.findOneAndUpdate({email:email},{$push:{workspaces:req.body._id}})
+                if (req.body._id) {
+                    const tempuser = await User.findOne({ email: email }, { _id: 1 })
+                    const adduser = await Workspace.findOneAndUpdate({ _id: mongoose.Types.ObjectId(req.body._id) }, { $push: { members: tempuser } })
+                    const addworkspace = await User.findOneAndUpdate({ email: email }, { $push: { workspaces: mongoose.Types.ObjectId(req.body._id) } })
                 }
 
                 res.status(200).send({ message: "Successfully Registration" })
@@ -109,8 +109,9 @@ router.post("/register", async (req, res) => {
 
 
     } else {
-        User.findOne({ email: email }, (err, user) => {
+        User.findOne({ email: email }, async (err, user) => {
             if (user) {
+
                 res.send({ message: "User Already Registered" })
             }
             else {
@@ -136,11 +137,11 @@ router.post("/register", async (req, res) => {
                                 res.send(err)
                             }
                             else {
-                                if(req.body._id){
-                                    const tempuser = await User.findOne({email:email},{_id:1})
+                                if (req.body._id) {
+                                    const tempuser = await User.findOne({ email: email }, { _id: 1 })
                                     console.log(tempuser)
-                                    const adduser = await Workspace.findOneAndUpdate({_id:req.body._id},{$push:{members:tempuser}})
-                                    const addworkspace = await User.findOneAndUpdate({email:email},{$push:{workspaces:{_id:mongoose.Types.ObjectId(req.body._id)}}})
+                                    const adduser = await Workspace.findOneAndUpdate({ _id: req.body._id }, { $push: { members: tempuser } })
+                                    const addworkspace = await User.findOneAndUpdate({ email: email }, { $push: { workspaces: { _id: mongoose.Types.ObjectId(req.body._id) } } })
                                 }
 
                                 res.status(200).send({ message: "Successfully Registration" })
@@ -273,11 +274,11 @@ router.post('/sendinvite', async (req, res) => {
 
 router.post('/users', async (req, res) => {
     let usersData = []
-    const Workspacemembers = await Workspace.findOne({_id:req.body.wsId},{members:1})
+    const Workspacemembers = await Workspace.findOne({ _id: req.body.wsId }, { members: 1 })
     console.log(Workspacemembers)
-    if(Workspacemembers){
-        for(member of Workspacemembers.members){
-            const tempuser = await User.findOne({_id:member._id})
+    if (Workspacemembers) {
+        for (member of Workspacemembers.members) {
+            const tempuser = await User.findOne({ _id: member._id })
             usersData.push(tempuser)
         }
     }
@@ -310,7 +311,6 @@ router.post('/createteam', async (req, res) => {
         res.send({ message: "Team of same name already exists" })
     }
     else {
-
         const admin = {
             _id: mongoose.Types.ObjectId(req.body.rootUser._id),
             name: req.body.rootUser.name,
@@ -323,42 +323,67 @@ router.post('/createteam', async (req, res) => {
             for (obj of array) {
                 const temp = await User.findOne({ name: obj }, { name: true, _id: true, number: true, role: true })
                 if (temp) {
-                    console.log(temp)
-                    members.push(temp)
+                    // console.log(temp._id)
+                    // console.log(admin._id)
+                    if (temp._id.toString() === req.body.rootUser._id.toString()) {
+
+                    } else {
+                        members.push(temp)
+                    }
                     //adding team name to user object
 
-                    const addedTeam = await User.findOneAndUpdate({ _id: temp._id }, { $push: { teams: req.body.teamName } })
+                    // const addedTeam = await User.findOneAndUpdate({ _id: temp._id }, { $push: { teams: req.body.teamName } })
                 }
             }
-            const addedTeam = await User.findOneAndUpdate({ _id: admin._id }, { $push: { teams: req.body.teamName } })
+            // const addedTeam = await User.findOneAndUpdate({ _id: admin._id }, { $push: { teams: req.body.teamName } })
 
             console.log(members)
 
-            const isAdmin = req.body.rootUser.type
+            const isAdmin = req.body.rootUser._id === req.body.workspace.admin
             let team = {}
-            if (isAdmin === 0) {
+            if (isAdmin) {
                 team = new Team({
                     name: req.body.teamName,
                     admin: admin,
+                    workspace: mongoose.Types.ObjectId(req.body.workspace._id),
                     state: true,
                     members: members
+                })
+                team.save(async (err) => {
+                    if (err) {
+                        console.log(err)
+                        res.send(err)
+                    }
+                    else {
+                        const thisteam = await Team.findOne({ name: req.body.teamName })
+                        for (member of thisteam.members) {
+                            const user = await User.findOneAndUpdate({ _id: member._id }, { $push: { teams: { _id: thisteam._id } } })
+                        }
+                        res.status(200).send({ message: "Successfull Team Registration" })
+                    }
                 })
             } else {
                 team = new Team({
                     name: req.body.teamName,
                     admin: admin,
+                    workspace: mongoose.Types.ObjectId(req.body.workspace._id),
                     members: members
                 })
+                team.save(async (err) => {
+                    if (err) {
+                        console.log(err)
+                        res.send(err)
+                    }
+                    else {
+                        const thisteam = await Team.findOne({ name: req.body.teamName })
+                        for (member of thisteam.members) {
+                            const user = await User.findOneAndUpdate({ _id: member._id }, { $push: { teams: { _id: thisteam._id } } })
+                        }
+                        res.status(200).send({ message: "Request for new team has been sent" })
+                    }
+                })
             }
-            team.save(async (err) => {
-                if (err) {
-                    console.log(err)
-                    res.send(err)
-                }
-                else {
-                    res.status(200).send({ message: "Successfull Team Registration" })
-                }
-            })
+
         } catch (e) {
             console.log(e.message)
         }
@@ -367,10 +392,11 @@ router.post('/createteam', async (req, res) => {
 
 //not approved teams
 
-router.get('/notapprovedteams', async (req, res) => {
+router.post('/notapprovedteams', async (req, res) => {
+    console.log(req.body)
     try {
-        const data = await Team.find({ state: false })
-
+        const data = await Team.find({ workspace: mongoose.Types.ObjectId(req.body.wsId), state: false })
+        console.log(`not approved Teams:${data}`)
         res.send(data)
     } catch (e) {
         res.send(e)
@@ -382,11 +408,19 @@ router.get('/notapprovedteams', async (req, res) => {
 router.post('/approveteam', async (req, res) => {
     const teamApproved = await Team.findOneAndUpdate({ name: req.body.name }, { state: true })
 
+
     if (teamApproved) {
         res.status(200).send({ message: "team is approved for this workspace" })
     } else {
         res.status(404).send()
     }
+})
+
+router.post('/rejectteam',async(req,res)=>{
+
+    const rejectteam = await Team.findOneAndDelete({name:req.body.name})
+
+    res.send({message:'Request Has Been Rejected'})
 })
 
 //delete team
@@ -423,15 +457,22 @@ router.post('/readteam', async (req, res) => {
 
     res.send(team)
 })
+
+router.post('/readteambyid', async (req, res) => {
+    const team = await Team.findOne({ _id: req.body._id })
+
+    console.log(req.body._id)
+    res.send(team)
+})
 //my teams api
 
 router.post('/myteams', async (req, res) => {
 
     const array = req.body.rootUser.teams
     let teams = []
-    // console.log(array)
+    // console.log(`WS:${req.body.wsId}`)
     for (obj of array) {
-        const tempteam = await Team.findOne({ name: obj })
+        const tempteam = await Team.findOne({ workspace: mongoose.Types.ObjectId(req.body.wsId), _id: obj._id })
         if (tempteam) {
             teams.push(tempteam)
         }
@@ -442,15 +483,17 @@ router.post('/myteams', async (req, res) => {
 })
 //all teams api
 
-router.get('/allteams', async (req, res) => {
-    const teams = await Team.find({ state: true })
+router.post('/allteams', async (req, res) => {
+
+    const teams = await Team.find({ workspace: mongoose.Types.ObjectId(req.body.wsId), state: true })
+    console.log(teams)
     res.send(teams)
 })
 
 //team name change api
 
 router.get('/actionnotapproved', async (req, res) => {
-    const teams = await Team.find({ 'action.0': { $exists: true } })
+    const teams = await Team.find({ workspace: mongoose.Types.ObjectId(req.body.wsId), 'action.0': { $exists: true } })
     let array = []
     for (val of teams) {
         // console.log(val.action)
@@ -544,7 +587,7 @@ router.post('/addusers', async (req, res) => {
                 by: req.body.rootUser,
                 metadata: name
             }
-    
+
             const remove = await Team.findOneAndUpdate({ name: req.body.team.name }, { $push: { action: action } })
             res.send({ message: "your request has been sent" })
         }
@@ -552,7 +595,7 @@ router.post('/addusers', async (req, res) => {
             res.send({ message: "you are not authorized to make change in the team" })
         }
         // console.log(data)
-       
+
     }
 })
 
@@ -626,13 +669,16 @@ router.post('/createworkspace', async (req, res) => {
     } else {
         const workspace = new Workspace({
             name: req.body.name,
-            admin:req.body.admin._id
+            admin: req.body.admin._id,
+            members: [{ _id: mongoose.Types.ObjectId(req.body.admin._id) }]
         })
         workspace.save(async (err) => {
             if (err) {
                 res.send(err)
             } else {
-                res.send({ message: "new workspace added" })
+                const tempws = await Workspace.findOne({ name: req.body.name })
+                const addworkspace = await User.findOneAndUpdate({ _id: req.body.admin._id }, { $push: { workspaces: { _id: tempws._id } } })
+                res.send({ message: "New Workspace Added" })
             }
         })
     }
@@ -642,7 +688,7 @@ router.post('/createworkspace', async (req, res) => {
 //read workspaces
 
 router.get('/readworkspaces', async (req, res) => {
-    const workspaces = await Workspace.find({}, { name: 1 })
+    const workspaces = await Workspace.find()
     // console.log(workspaces)
     res.send(workspaces)
 })
@@ -662,6 +708,7 @@ router.post('/addcustomer', async (req, res) => {
     try {
 
         const { name, location, number, website, email } = req.body.customerData
+        console.log(req.body.contactList)
 
         const exists = await Clients.find({ name: name })
 
@@ -674,13 +721,15 @@ router.post('/addcustomer', async (req, res) => {
                 number: number.toString(),
                 email: email.toString(),
                 location: location.toString(),
-                website: website.toString()
+                website: website.toString(),
+               
             })
             client.save(async (err) => {
                 if (err) {
                     res.send(err)
                 } else {
                     const cl = await Clients.findOne({ name: name }, { _id: 1 })
+                    const addContacts = await Clients.findOneAndUpdate({ name: name }, {$push:{contacts:req.body.contactList} })
                     // console.log(cl)
                     const workspace = await Workspace.findOneAndUpdate({ _id: req.body._id }, { $push: { 'clients': { _id: cl._id } } })
                     res.send({ message: "new client added" })
@@ -711,7 +760,8 @@ router.post('/addproject', async (req, res) => {
                 name: info.name,
                 due: info.due,
                 manager: manager,
-                requirements: requirements
+                requirements: requirements,
+                members:[{_id:mongoose.Types.ObjectId(manager._id)}]
             })
             project.save(async (err) => {
                 if (err) {
@@ -788,6 +838,105 @@ router.post('/addtask', async (req, res) => {
         })
     res.send()
 })
+
+router.post('/isregistered', async (req, res) => {
+    // console.log(req.body)
+    let registered = false
+    const { wsId, userMail } = req.body
+
+    const isRegistered = await User.findOne({ email: userMail })
+
+    if (isRegistered) {
+        registered = true
+        // const tempuser = await User.findOne({ email: email }, { _id: 1 })
+        const adduser = await Workspace.findOneAndUpdate({ _id: mongoose.Types.ObjectId(wsId) }, { $push: { members: isRegistered._id } })
+        const addworkspace = await User.findOneAndUpdate({ _id: isRegistered._id }, { $push: { workspaces: mongoose.Types.ObjectId(wsId)} })        
+
+    } else {
+
+    }
+    res.send({ registered: registered })
+})
+
+
+router.post('/updateclientdetail',async(req,res)=>{
+    const {name,location,email,number,website} = req.body
+
+    const update = await Clients.findOneAndUpdate({_id:req.body._id},{$set:{name:name,location:location,email:email,website:website,number:number,contacts:contacts}})
+
+    res.send({message:"Client Details Are Updated"})
+})
+
+router.post('/readclient',async(req,res)=>{
+    const client = await Clients.findOne({_id:req.body._id})
+
+    res.send(client)
+})
+
+
+router.post('/updatecontactsofclient',async(req,res)=>{
+    
+    const update = await Clients.findOneAndUpdate({_id:req.body._id},{$set:{contacts:req.body.contacts}})
+
+    res.send({message:"Contacts Are Updated"})
+})
+
+router.post('/deletecontact',async(req,res)=>{
+    const update = await Clients.findOneAndUpdate({_id:req.body._id},{})
+})
+
+router.post('/addprojectforclient', async (req, res) => {
+    try {
+
+        // const workspace = await Workspace.findOne({ _id: req.body._id })
+        const { info, manager, requirements } = req.body.projectData
+
+        const exists = await Projects.find({ name: info.name })
+        if (!(exists.length === 0)) {
+            res.send({ message: "project with same name already exists" })
+        } else {
+            const project = new Projects({
+                workspaceId: req.body._id,
+                clientId:req.body.clientId,
+                name: info.name,
+                due: info.due,
+                manager: manager,
+                requirements: requirements,
+                members:[{_id:mongoose.Types.ObjectId(manager._id)}]
+            })
+            project.save(async (err) => {
+                if (err) {
+                    res.send(err)
+                } else {
+                    const pr = await Projects.findOne({ name: info.name }, { _id: 1 })
+                    // console.log(pr)
+                    const workspace = await Workspace.findOneAndUpdate({ _id: req.body._id }, { $push: { 'projects': { _id: pr._id } } })
+                    const client = await Clients.findOneAndUpdate({_id:req.body.clientId},{$push:{'projects': { _id: pr._id } }})
+                    res.send({ message: "new project added for this client" })
+                }
+            })
+
+        }
+    } catch (err) {
+        console.log(err)
+        res.send(err)
+    }
+
+})
+
+router.post('/getclientprojects',async(req,res)=>{
+    const {projects} = req.body
+    let projectArray = []
+
+    for(obj of projects){
+        const project = await Projects.findOne({_id:obj._id})
+
+        projectArray.push(project)
+    }
+    console.log(projectArray)
+    res.send(projectArray)
+})
+
 module.exports = router
 
 
