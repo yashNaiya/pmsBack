@@ -51,6 +51,11 @@ const Infouser = new mongoose.Schema({
             type: mongoose.Schema.Types.Mixed,
         }
     ],
+    projects:[
+        {
+            type: mongoose.Schema.Types.Mixed,
+        }
+    ],
     teams: [
         {
             type: mongoose.Schema.Types.Mixed,

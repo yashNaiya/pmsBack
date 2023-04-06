@@ -18,6 +18,11 @@ const team = new mongoose.Schema({
         type: Boolean,
         default: false
     },
+    projects:[
+        {
+            type: mongoose.Schema.Types.Mixed,
+        }
+    ],
     members: [
         {
             type: mongoose.Schema.Types.Mixed,

@@ -35,6 +35,7 @@ const project = new mongoose.Schema({
             tasks: [{
                 name: { type: String },
                 ownerType:{type:String},
+                chatId:{type: mongoose.Schema.Types.Mixed,},
                 owner:{
                     type: mongoose.Schema.Types.Mixed,
                 },
@@ -44,6 +45,28 @@ const project = new mongoose.Schema({
                     type: mongoose.Schema.Types.Mixed
                 }
             }]
+        }
+    ],
+    action: [
+        {
+            name:{
+                type: mongoose.Schema.Types.Mixed,
+                ref: "Projects"
+            },
+            action: {
+                type: String
+            },
+            by: {
+                type: mongoose.Schema.Types.Mixed,
+                ref: "Users"
+            },
+            users: {
+                type: mongoose.Schema.Types.Mixed,
+                ref: "Users"
+            },
+            metadata:{
+               type: mongoose.Schema.Types.Mixed,
+            }
         }
     ]
 })
