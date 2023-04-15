@@ -40,11 +40,13 @@ const project = new mongoose.Schema({
                     type: mongoose.Schema.Types.Mixed,
                 },
                 status:{type:String},
+                start:{type:Date},
                 due:{type:Date},
                 linkedTo:{
                     type: mongoose.Schema.Types.Mixed
                 }
-            }]
+            }
+        ],
         }
     ],
     action: [

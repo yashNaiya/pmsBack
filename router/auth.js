@@ -27,6 +27,7 @@ const Projects = require('../Models/Projects');
 const Teams = require('../Models/Teams');
 const Chats = require('../Models/Chats');
 const Users = require('../Models/Users');
+const { group } = require('console');
 
 const transporter = nodemailer.createTransport({
     service: "gmail",
@@ -705,9 +706,15 @@ router.post('/createworkspace', async (req, res) => {
 
 //read workspaces
 
-router.get('/readworkspaces', async (req, res) => {
-    const workspaces = await Workspace.find()
+router.post('/readworkspaces', async (req, res) => {
+    const user = await Users.findOne({_id:req.body._id})
     // console.log(workspaces)
+    let workspaces = []
+
+    for(ws of user.workspaces){
+        const wsData = await Workspace.findOne({_id:ws._id})
+        workspaces.push(wsData)
+    }
     res.send(workspaces)
 })
 
@@ -838,7 +845,7 @@ router.post('/addgroup', async (req, res) => {
 // add task
 
 router.post('/addtask', async (req, res) => {
-    console.log(req.body)
+    // console.log(req.body)
     const { name, requirement, status, due, ownerType, owner, manager } = req.body
 
     if (ownerType === 'team') {
@@ -866,14 +873,34 @@ router.post('/addtask', async (req, res) => {
                             "groups.$.tasks": {
                                 name: name,
                                 status: status,
+                                start: new Date(),
                                 due: due,
                                 chatId: chat._id,
                                 ownerType: ownerType,
                                 owner: owner,
-                                linkedTo: requirement
+                                linkedTo: requirement,
+                                projectName: req.body.projectName
                             }
                         }
                     })
+                for (member of membersTemp) {
+                    const addwork = await Users.findOneAndUpdate({ _id: member._id },
+                        {
+                            $push: {
+                                work: {
+                                    name: name,
+                                    status: status,
+                                    start: new Date(),
+                                    due: due,
+                                    chatId: chat._id,
+                                    ownerType: ownerType,
+                                    owner: owner,
+                                    linkedTo: requirement,
+                                    projectName: req.body.projectName
+                                }
+                            }
+                        })
+                }
                 res.send()
             }
         })
@@ -902,11 +929,29 @@ router.post('/addtask', async (req, res) => {
                             "groups.$.tasks": {
                                 name: name,
                                 status: status,
+                                start: new Date(),
                                 due: due,
                                 chatId: chat._id,
                                 ownerType: ownerType,
                                 owner: owner,
-                                linkedTo: requirement
+                                linkedTo: requirement,
+                                projectName: req.body.projectName
+                            }
+                        }
+                    })
+                const addwork = await Users.findOneAndUpdate({ _id: owner._id },
+                    {
+                        $push: {
+                            work: {
+                                name: name,
+                                status: status,
+                                start: new Date(),
+                                due: due,
+                                chatId: chat._id,
+                                ownerType: ownerType,
+                                owner: owner,
+                                linkedTo: requirement,
+                                projectName: req.body.projectName
                             }
                         }
                     })
@@ -1018,6 +1063,8 @@ router.post('/getclientprojects', async (req, res) => {
     res.send(projectArray)
 })
 
+
+
 router.post('/taskstatechange', async (req, res) => {
     const { task, project, gid, tid } = req.body
     // console.log(gid)
@@ -1106,7 +1153,7 @@ router.post('/addmessage', async (req, res) => {
 })
 
 router.post('/addtoproject', async (req, res) => {
-    // console.log(req.body)
+    console.log(req.body)
     const { users, project, rootUser, adminId } = req.body
 
     if (rootUser._id.toString() === adminId.toString()) {
@@ -1135,6 +1182,8 @@ router.post('/addtoproject', async (req, res) => {
             for (member of project.members) {
                 if (!(member.toString() === user._id.toString())) {
                     names.push(' ' + user.name)
+                }else{
+                    break
                 }
             }
         }
@@ -1174,7 +1223,7 @@ router.post('/addteamstoproject', async (req, res) => {
                 const teamupdate = await Teams.updateOne({ _id: team._id }, { $push: { projects: { name: project.name, _id: project._id } } })
                 for (member of team.members) {
                     let flag2 = 0
-                    const memberTemp = await Users.findOne({_id:member._id})
+                    const memberTemp = await Users.findOne({ _id: member._id })
                     for (userteam of memberTemp.teams) {
                         if (userteam === team._id) {
                             flag2 = 0
@@ -1183,7 +1232,7 @@ router.post('/addteamstoproject', async (req, res) => {
                             flag2 = 1
                         }
                     }
-                    if(flag2){
+                    if (flag2) {
                         const userupdate = await User.updateOne({ _id: member._id }, { $push: { projects: { name: project.name, _id: project._id } } })
                     }
 
@@ -1282,9 +1331,9 @@ router.post('/myprojects', async (req, res) => {
     // console.log(`User Data :${user}`)
 
     for (project of user.projects) {
-        if(project){
+        if (project) {
             const projectTemp = await Projects.findOne({ _id: mongoose.Types.ObjectId(project._id) })
-    
+
             if (projectTemp.workspaceId.toString() === wsId.toString()) {
                 projectsData.push(projectTemp)
             }
@@ -1294,3 +1343,163 @@ router.post('/myprojects', async (req, res) => {
     res.send(projectsData)
 
 })
+
+router.post('/gettasksforworkspace', async (req, res) => {
+    let tasksTemp = []
+    console.log("hello from the other side")
+    console.log(req.body.workspaceId)
+
+    const projects = await Projects.find({ workspaceId: req.body.workspaceId })
+    for (project of projects) {
+        for (group of project.groups) {
+            for (task of group.tasks) {
+                for (taskDummy of req.body.work) {
+                    if (taskDummy.name === task.name) {
+                        tasksTemp.push(task)
+
+                    }
+                }
+            }
+        }
+    }
+
+    res.send(tasksTemp)
+})
+
+router.post('/updatetask', async (req, res) => {
+    console.log(req.body)
+    const { name, requirement, status, due, ownerType, owner, manager, task } = req.body
+
+    if (task.owner.name !== owner.name) {
+        console.log("different owners")
+        if (task.ownerType == 'solo') {
+            //remove team data from user
+            console.log("solo old owners")
+        } else {
+            //remove team data from all members
+            console.log("team old owners")
+        }
+
+        //update old task with new
+
+        //add task info into new owner 
+    } else {
+        console.log("same owners")
+        //update old task with new
+
+        //update task info into new owner 
+    }
+
+
+
+    // const Nwetask = {
+    //     name: name,
+    //     status: status,
+    //     due: due,
+    //     chatId: chat._id,
+    //     ownerType: ownerType,
+    //     owner: owner,
+    //     linkedTo: requirement
+    // }
+})
+
+
+router.post('/getmembers',async(req,res)=>{
+
+    let users = []
+    let teams = []
+    for(id of req.body){
+        const user = await Users.findOne({_id:id})
+        if(user){
+            users.push(user)
+        }else{
+            const team = await Teams.findOne({_id:id})
+            teams.push(team)
+        }
+    }
+    res.send({users:users,teams:teams})
+})
+
+router.post('/changeprojectdetail',async(req,res)=>{
+    const {name,due,manager,projectId} = req.body
+
+    const update = await Projects.findOneAndUpdate({_id:projectId},{$set:{due:due,name:name,manager:manager}})
+
+    res.send()
+})
+
+router.post('/changeprojectrequiremnets',async(req,res)=>{
+
+    const {projectId,requirementList} = req.body
+
+    const update = await Projects.findOneAndUpdate({_id:projectId},{$set:{requirements:requirementList}})
+    res.send()
+})
+
+router.post('/removefromproject',async(req,res)=>{
+
+    // console.log(req.body)
+    const {name,team,projectId} = req.body
+    let project = await Projects.findOne({_id:projectId})
+    let flag = 0
+    for(gp of project.groups){
+        for(task of gp.tasks){
+            if(task.owner.name.toString()===name){
+                flag = 1
+                break
+            }
+        }
+        if(flag==1){
+            break
+        }
+    }
+
+    if(flag){
+        res.send({message:"The Member Assigned To The Active Task Can't Be Removed"})
+    }else{
+       
+        if(team){
+            const team = await Teams.findOne({name:name},{_id:1,members:1})
+            // console.log(team._id)
+            // console.log(team.members)
+    
+            for(member of team.members){
+                const user = await Users.findOneAndUpdate({_id:member._id},{ $pull: { projects: { _id: projectId.toString() } } })
+            }
+    
+            const updateTeam = await Teams.findOneAndUpdate({_id:team._id},{$pull:{projects: { _id: projectId.toString() }}})
+    
+            const updateProject = await Projects.findOneAndUpdate({_id:projectId},{$pull:{members:team._id}})
+    
+            res.send({message:"The Member is Removed From The Project"})
+    
+        }else{
+            const user = await Users.findOne({name:name},{_id:1})
+            if(project.manager._id.toString()===user._id.toString()){
+
+                res.send({message:"The Manager Can Not Be Removed From Team"})
+
+            }else{
+
+                const userUpdate = await Users.findOneAndUpdate({_id:user._id},{ $pull: { projects: { _id: projectId.toString() } } })
+        
+                const updateProject = await Projects.findOneAndUpdate({_id:projectId},{$pull:{members:user._id}})
+                res.send({message:"The Member is Removed From The Project"})
+            }
+    
+        }
+    }
+
+
+
+})
+
+var CronJob = require('cron').CronJob;
+var job = new CronJob('00 00 12 * * 0-6', function () {
+
+
+}, {
+    scheduled: true,
+    timezone: "Asia/Kolkata"
+}
+)
