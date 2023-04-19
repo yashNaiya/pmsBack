@@ -44,7 +44,8 @@ const project = new mongoose.Schema({
                 due:{type:Date},
                 linkedTo:{
                     type: mongoose.Schema.Types.Mixed
-                }
+                },
+                projectName:{type:String},
             }
         ],
         }

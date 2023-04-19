@@ -707,12 +707,12 @@ router.post('/createworkspace', async (req, res) => {
 //read workspaces
 
 router.post('/readworkspaces', async (req, res) => {
-    const user = await Users.findOne({_id:req.body._id})
+    const user = await Users.findOne({ _id: req.body._id })
     // console.log(workspaces)
     let workspaces = []
 
-    for(ws of user.workspaces){
-        const wsData = await Workspace.findOne({_id:ws._id})
+    for (ws of user.workspaces) {
+        const wsData = await Workspace.findOne({ _id: ws._id })
         workspaces.push(wsData)
     }
     res.send(workspaces)
@@ -1182,7 +1182,7 @@ router.post('/addtoproject', async (req, res) => {
             for (member of project.members) {
                 if (!(member.toString() === user._id.toString())) {
                     names.push(' ' + user.name)
-                }else{
+                } else {
                     break
                 }
             }
@@ -1346,17 +1346,16 @@ router.post('/myprojects', async (req, res) => {
 
 router.post('/gettasksforworkspace', async (req, res) => {
     let tasksTemp = []
-    console.log("hello from the other side")
+    // console.log("hello from the other side")
     console.log(req.body.workspaceId)
 
-    const projects = await Projects.find({ workspaceId: req.body.workspaceId })
+    let projects = await Projects.find({ workspaceId: req.body.workspaceId })
     for (project of projects) {
-        for (group of project.groups) {
-            for (task of group.tasks) {
+        for (gp of project.groups) {
+            for (task of gp.tasks) {
                 for (taskDummy of req.body.work) {
                     if (taskDummy.name === task.name) {
                         tasksTemp.push(task)
-
                     }
                 }
             }
@@ -1368,125 +1367,300 @@ router.post('/gettasksforworkspace', async (req, res) => {
 
 router.post('/updatetask', async (req, res) => {
     console.log(req.body)
-    const { name, requirement, status, due, ownerType, owner, manager, task } = req.body
+    const { name, groupId, projectId, requirement, status, due, ownerType, owner, manager, task } = req.body
 
     if (task.owner.name !== owner.name) {
-        console.log("different owners")
+        // console.log("different owners")
         if (task.ownerType == 'solo') {
             //remove team data from user
-            console.log("solo old owners")
+            const update = await Users.findOneAndUpdate({ _id: mongoose.Types.ObjectId(task.owner._id) },
+                { $pull: { work: { "chatId": mongoose.Types.ObjectId(task.chatId)  } } }
+            )
+            // console.log("solo old owners")
         } else {
             //remove team data from all members
+            for (member of task.owner.members) {
+                const update = await Users.findOneAndUpdate({ _id: mongoose.Types.ObjectId(member._id) },
+                    { $pull: { work: { "chatId": mongoose.Types.ObjectId(task.chatId) } } }
+                )
+            }
             console.log("team old owners")
         }
 
         //update old task with new
+        const taskupdate = await Projects.findOneAndUpdate(
+            {
+                _id: projectId,
+                "groups": {
+                    "$elemMatch": {
+                        "_id": groupId, "tasks._id": task._id
+                    }
+                }
+            },
+            {
+                $set: {
+                    "groups.$[outer].tasks.$[inner]": {
+                        name: name,
+                        status: status,
+                        start: task.start,
+                        due: due,
+                        chatId: mongoose.Types.ObjectId(task.chatId),
+                        ownerType: ownerType,
+                        owner: owner,
+                        linkedTo: requirement,
+                        projectName: req.body.projectName,
+                        _id: task._id
+                    }
+                }
+            },
+            {
+                "arrayFilters": [
+                    { "outer._id": groupId },
+                    { "inner._id": task._id }
+                ]
+            }
+        )
 
         //add task info into new owner 
+        if (ownerType === 'solo') {
+            const addwork = await Users.findOneAndUpdate({ _id: mongoose.Types.ObjectId(owner._id) },
+                {
+                    $push: {
+                        work: {
+                            name: name,
+                            status: status,
+                            start: task.start,
+                            due: due,
+                            chatId: mongoose.Types.ObjectId(task.chatId),
+                            ownerType: ownerType,
+                            owner: owner,
+                            linkedTo: requirement,
+                            projectName: req.body.projectName
+                        }
+                    }
+                })
+        } else {
+            for(member of owner.members){
+                const addwork = await Users.findOneAndUpdate({ _id: mongoose.Types.ObjectId(member._id) },
+                {
+                    $push: {
+                        work: {
+                            name: name,
+                            status: status,
+                            start: task.start,
+                            due: due,
+                            chatId: mongoose.Types.ObjectId(task.chatId),
+                            ownerType: ownerType,
+                            owner: owner,
+                            linkedTo: requirement,
+                            projectName: req.body.projectName
+                        }
+                    }
+                })
+            }
+
+        }
+
     } else {
         console.log("same owners")
         //update old task with new
+        const taskupdate = await Projects.findOneAndUpdate(
+            {
+                _id: projectId,
+                "groups": {
+                    "$elemMatch": {
+                        "_id": groupId, "tasks._id": task._id
+                    }
+                }
+            },
+            {
+                $set: {
+                    "groups.$[outer].tasks.$[inner]": {
+                        name: name,
+                        status: status,
+                        start: task.start,
+                        due: due,
+                        chatId: task.chatId,
+                        ownerType: ownerType,
+                        owner: owner,
+                        linkedTo: requirement,
+                        projectName: req.body.projectName,
+                        _id: task._id
+                    }
+                }
+            },
+            {
+                "arrayFilters": [
+                    { "outer._id": groupId },
+                    { "inner._id": task._id }
+                ]
+            }
+        )
 
-        //update task info into new owner 
+        //update work array
+        const userupdate = await Users.findOneAndUpdate(
+            {
+                _id: mongoose.Types.ObjectId(owner._id),
+                "work": {
+                    "$elemMatch": {
+                        "chatId": task.chatId
+                    }
+                }
+            },
+            {
+                $set: {
+                    "work.$[outer]": {
+                        name: name,
+                        status: status,
+                        due: due,
+                        ownerType: ownerType,
+                        owner: owner,
+                        linkedTo: requirement,
+                    }
+                }
+            },
+            {
+                "arrayFilters": [
+                    { "outer.chatId": task.chatId }
+                ]
+            }
+        )
+
+
     }
-
-
-
-    // const Nwetask = {
-    //     name: name,
-    //     status: status,
-    //     due: due,
-    //     chatId: chat._id,
-    //     ownerType: ownerType,
-    //     owner: owner,
-    //     linkedTo: requirement
-    // }
+    res.send({ message: "Task is Updated" })
 })
 
+router.post('/deletetask', async (req, res) => {
+    const { task, projectId, groupId } = req.body
+    // if (task.ownerType === 'solo') {
+    //     const user = await Users.findOneAndUpdate({ _id: mongoose.Types.ObjectId(task.owner._id) }, {
+    //         $pull: { work: { name: task.name } }
+    //     })
+    // } else {
 
-router.post('/getmembers',async(req,res)=>{
+    // }
+    const taskupdate = await Projects.findOneAndUpdate(
+        {
+            _id: mongoose.Types.ObjectId(projectId),
+
+        },
+        {
+            $unset: {
+                "groups.$[outer].tasks.$[inner]": ""
+            }
+        },
+        {
+            "arrayFilters": [
+                { "outer._id": groupId },
+                { "inner._id": task._id }
+            ]
+        }
+    )
+    const removenull = await Projects.findOneAndUpdate({
+        _id: mongoose.Types.ObjectId(projectId),
+    },
+        {
+            $pull: {
+                "groups.$[outer].tasks":null
+            }
+        },
+        {
+            "arrayFilters": [
+                { "outer._id": groupId },
+                { "inner._id": task._id }
+            ]
+        }
+
+    )
+    console.log(taskupdate)
+    res.send()
+    // console.log(req.body)
+})
+
+router.post('/getmembers', async (req, res) => {
 
     let users = []
     let teams = []
-    for(id of req.body){
-        const user = await Users.findOne({_id:id})
-        if(user){
+    for (id of req.body) {
+        const user = await Users.findOne({ _id: id })
+        if (user) {
             users.push(user)
-        }else{
-            const team = await Teams.findOne({_id:id})
+        } else {
+            const team = await Teams.findOne({ _id: id })
             teams.push(team)
         }
     }
-    res.send({users:users,teams:teams})
+    res.send({ users: users, teams: teams })
 })
 
-router.post('/changeprojectdetail',async(req,res)=>{
-    const {name,due,manager,projectId} = req.body
+router.post('/changeprojectdetail', async (req, res) => {
+    const { name, due, manager, projectId } = req.body
 
-    const update = await Projects.findOneAndUpdate({_id:projectId},{$set:{due:due,name:name,manager:manager}})
+    const update = await Projects.findOneAndUpdate({ _id: projectId }, { $set: { due: due, name: name, manager: manager } })
 
     res.send()
 })
 
-router.post('/changeprojectrequiremnets',async(req,res)=>{
+router.post('/changeprojectrequiremnets', async (req, res) => {
 
-    const {projectId,requirementList} = req.body
+    const { projectId, requirementList } = req.body
 
-    const update = await Projects.findOneAndUpdate({_id:projectId},{$set:{requirements:requirementList}})
+    const update = await Projects.findOneAndUpdate({ _id: projectId }, { $set: { requirements: requirementList } })
     res.send()
 })
 
-router.post('/removefromproject',async(req,res)=>{
+router.post('/removefromproject', async (req, res) => {
 
     // console.log(req.body)
-    const {name,team,projectId} = req.body
-    let project = await Projects.findOne({_id:projectId})
+    const { name, team, projectId } = req.body
+    let project = await Projects.findOne({ _id: projectId })
     let flag = 0
-    for(gp of project.groups){
-        for(task of gp.tasks){
-            if(task.owner.name.toString()===name){
+    for (gp of project.groups) {
+        for (task of gp.tasks) {
+            if (task.owner.name.toString() === name) {
                 flag = 1
                 break
             }
         }
-        if(flag==1){
+        if (flag == 1) {
             break
         }
     }
 
-    if(flag){
-        res.send({message:"The Member Assigned To The Active Task Can't Be Removed"})
-    }else{
-       
-        if(team){
-            const team = await Teams.findOne({name:name},{_id:1,members:1})
+    if (flag) {
+        res.send({ message: "The Member Assigned To The Active Task Can't Be Removed" })
+    } else {
+
+        if (team) {
+            const team = await Teams.findOne({ name: name }, { _id: 1, members: 1 })
             // console.log(team._id)
             // console.log(team.members)
-    
-            for(member of team.members){
-                const user = await Users.findOneAndUpdate({_id:member._id},{ $pull: { projects: { _id: projectId.toString() } } })
+
+            for (member of team.members) {
+                const user = await Users.findOneAndUpdate({ _id: member._id }, { $pull: { projects: { _id: projectId.toString() } } })
             }
-    
-            const updateTeam = await Teams.findOneAndUpdate({_id:team._id},{$pull:{projects: { _id: projectId.toString() }}})
-    
-            const updateProject = await Projects.findOneAndUpdate({_id:projectId},{$pull:{members:team._id}})
-    
-            res.send({message:"The Member is Removed From The Project"})
-    
-        }else{
-            const user = await Users.findOne({name:name},{_id:1})
-            if(project.manager._id.toString()===user._id.toString()){
 
-                res.send({message:"The Manager Can Not Be Removed From Team"})
+            const updateTeam = await Teams.findOneAndUpdate({ _id: team._id }, { $pull: { projects: { _id: projectId.toString() } } })
 
-            }else{
+            const updateProject = await Projects.findOneAndUpdate({ _id: projectId }, { $pull: { members: team._id } })
 
-                const userUpdate = await Users.findOneAndUpdate({_id:user._id},{ $pull: { projects: { _id: projectId.toString() } } })
-        
-                const updateProject = await Projects.findOneAndUpdate({_id:projectId},{$pull:{members:user._id}})
-                res.send({message:"The Member is Removed From The Project"})
+            res.send({ message: "The Member is Removed From The Project" })
+
+        } else {
+            const user = await Users.findOne({ name: name }, { _id: 1 })
+            if (project.manager._id.toString() === user._id.toString()) {
+
+                res.send({ message: "The Manager Can Not Be Removed From Team" })
+
+            } else {
+
+                const userUpdate = await Users.findOneAndUpdate({ _id: user._id }, { $pull: { projects: { _id: projectId.toString() } } })
+
+                const updateProject = await Projects.findOneAndUpdate({ _id: projectId }, { $pull: { members: user._id } })
+                res.send({ message: "The Member is Removed From The Project" })
             }
-    
+
         }
     }
 
