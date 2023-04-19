@@ -52,7 +52,6 @@ const team = new mongoose.Schema({
     ]
 })
 
-
 const Teams = mongoose.model("Teams", team);
 
 module.exports = Teams;
