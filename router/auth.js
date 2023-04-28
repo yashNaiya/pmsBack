@@ -10,6 +10,7 @@ const multer = require('multer')
 const nodemailer = require("nodemailer");
 var jwt = require('jsonwebtoken');
 
+
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
         cb(null, './Uploads/images');
@@ -18,7 +19,16 @@ const storage = multer.diskStorage({
         cb(null, Date.now() + '_' + file.originalname);
     }
 })
+const storage2 = multer.diskStorage({
+    destination: function (req, file, cb) {
+        cb(null, './Uploads/docs');
+    },
+    filename: function (req, file, cb) {
+        cb(null, Date.now() + '_' + file.originalname);
+    }
+})
 var upload = multer({ storage: storage })
+var upload2 = multer({ storage: storage2 })
 
 const path = require("path");
 const { EOF } = require('dns');
@@ -38,7 +48,7 @@ const transporter = nodemailer.createTransport({
 })
 
 router.use("/images", express.static(path.join("Uploads/images")));
-
+router.use('/docs', express.static(path.join("Uploads/docs")))
 
 router.post("/login", (req, res) => {
 
@@ -187,6 +197,44 @@ router.post('/signout', async (req, res) => {
     }
 })
 
+router.post('/adddoc', upload2.single('doc'), async (req, res) => {
+    const name = req.body.name.toString()
+
+    const updateproject = await Projects.findOneAndUpdate({ name: name }, { $set: { doc: req.file.filename } })
+
+    if (req.body.page.toString() === 'manage') {
+        res.send({ message: "Document Uploaded" })
+    } else {
+
+        res.send()
+    }
+})
+
+router.post('/removedoc', async (req, res) => {
+    const updateproject = await Projects.findOneAndUpdate({ _id: req.body._id }, { $set: { doc: '' } })
+
+    res.send()
+})
+
+router.post('/addtochat', async (req, res) => {
+    const chat = await Chats.findOne({ _id: mongoose.Types.ObjectId(req.body._id) })
+    let flag = 0
+    for (member of chat.members) {
+        if (member._id.toString() === req.body.memberId.toString()) {
+            flag = 1
+            break
+        }
+    }
+    if (flag) {
+        res.send()
+    } else {
+
+        const addtochat = await Chats.findOneAndUpdate({ _id: mongoose.Types.ObjectId(req.body._id) }, { $push: { members: { _id: req.body.memberId } } })
+
+        res.send()
+    }
+})
+
 router.post("/updateprofile", upload.single('image'), async (req, res) => {
     try {
         const _id = req.body._id
@@ -260,7 +308,7 @@ router.post('/sendinvite', async (req, res) => {
         from: 'pmsdummy16',
         to: req.body.to,
         secure: true,
-        subject: "Sending Email For password Reset",
+        subject: "Workspace joining invitation from PMS",
         text: `You have been invited to join project management team  http://localhost:3000/register/${req.body._id}/${req.body.to} `
     }
 
@@ -375,6 +423,8 @@ router.post('/createteam', async (req, res) => {
                     else {
                         const thisteam = await Team.findOne({ name: req.body.teamName })
                         for (member of thisteam.members) {
+                            const notify = await User.findOneAndUpdate({ _id: member._id }, { $push: { notification: { message: `You Have Been Added To The Team ${thisteam.name} In ${req.body.workspace.name} Workspace` } } })
+
                             const user = await User.findOneAndUpdate({ _id: member._id }, { $push: { teams: { _id: thisteam._id } } })
                         }
                         res.status(200).send({ message: "Successfull Team Registration" })
@@ -636,6 +686,9 @@ router.post('/approveaction', async (req, res) => {
                 if (update) {
                     console.log(update)
                     const userupdate = await User.updateOne({ _id: user._id }, { $push: { teams: data[0].name } })
+                    if (userupdate) {
+                        const notify = await User.findOneAndUpdate({ _id: user._id }, { $push: { notification: { message: `You Have Been Added To The Team ${data[0].name}` } } })
+                    }
                 }
             }
         }
@@ -648,6 +701,7 @@ router.post('/approveaction', async (req, res) => {
 
         if (findTeam && removedfromuser) {
             const update = await Team.updateOne({ _id: data[0]._id }, { $pull: { 'action': { $and: [{ 'metadata': data[3] }, { 'name': data[0] }, { 'by': data[2] }] } } })
+            const notify = await User.findOneAndUpdate({ name: data[3] }, { $push: { notification: { message: `You Have Been Removed To The Team ${data[0].name}` } } })
             res.send("User removed from the team")
         } else {
             res.send()
@@ -884,6 +938,7 @@ router.post('/addtask', async (req, res) => {
                         }
                     })
                 for (member of membersTemp) {
+                    const notify = await User.findOneAndUpdate({ _id: mongoose.Types.ObjectId(member._id) }, { $push: { notification: { message: `You Have Been Assigned A New Task In Project ${req.body.projectName} ` } } })
                     const addwork = await Users.findOneAndUpdate({ _id: member._id },
                         {
                             $push: {
@@ -1374,7 +1429,7 @@ router.post('/updatetask', async (req, res) => {
         if (task.ownerType == 'solo') {
             //remove team data from user
             const update = await Users.findOneAndUpdate({ _id: mongoose.Types.ObjectId(task.owner._id) },
-                { $pull: { work: { "chatId": mongoose.Types.ObjectId(task.chatId)  } } }
+                { $pull: { work: { "chatId": mongoose.Types.ObjectId(task.chatId) } } }
             )
             // console.log("solo old owners")
         } else {
@@ -1440,23 +1495,23 @@ router.post('/updatetask', async (req, res) => {
                     }
                 })
         } else {
-            for(member of owner.members){
+            for (member of owner.members) {
                 const addwork = await Users.findOneAndUpdate({ _id: mongoose.Types.ObjectId(member._id) },
-                {
-                    $push: {
-                        work: {
-                            name: name,
-                            status: status,
-                            start: task.start,
-                            due: due,
-                            chatId: mongoose.Types.ObjectId(task.chatId),
-                            ownerType: ownerType,
-                            owner: owner,
-                            linkedTo: requirement,
-                            projectName: req.body.projectName
+                    {
+                        $push: {
+                            work: {
+                                name: name,
+                                status: status,
+                                start: task.start,
+                                due: due,
+                                chatId: mongoose.Types.ObjectId(task.chatId),
+                                ownerType: ownerType,
+                                owner: owner,
+                                linkedTo: requirement,
+                                projectName: req.body.projectName
+                            }
                         }
-                    }
-                })
+                    })
             }
 
         }
@@ -1562,7 +1617,7 @@ router.post('/deletetask', async (req, res) => {
     },
         {
             $pull: {
-                "groups.$[outer].tasks":null
+                "groups.$[outer].tasks": null
             }
         },
         {
