@@ -309,7 +309,7 @@ router.post('/sendinvite', async (req, res) => {
         to: req.body.to,
         secure: true,
         subject: "Workspace joining invitation from PMS",
-        text: `You have been invited to join project management team  http://localhost:3000/register/${req.body._id}/${req.body.to} `
+        text: `You have been invited to join project management team http://localhost:3000/register/${req.body._id}/${req.body.to} `
     }
 
 
@@ -549,6 +549,13 @@ router.post('/myteams', async (req, res) => {
     res.send(teams)
 
 })
+
+//clear notification 
+
+router.post('/clearnotifications',async(req,res)=>{
+    const delnot = await Users.findOneAndUpdate({_id:req.body.userId},{$set:{notification:[]}})
+    res.send()
+})
 //all teams api
 
 router.post('/allteams', async (req, res) => {
@@ -743,7 +750,7 @@ router.post('/createworkspace', async (req, res) => {
         const workspace = new Workspace({
             name: req.body.name,
             admin: req.body.admin._id,
-            members: [{ _id: mongoose.Types.ObjectId(req.body.admin._id) }]
+            members: [mongoose.Types.ObjectId(req.body.admin._id)]
         })
         workspace.save(async (err) => {
             if (err) {
@@ -757,7 +764,21 @@ router.post('/createworkspace', async (req, res) => {
     }
 })
 
+//group name change
 
+router.post('/groupnamechange',async(req,res)=>{
+    const {newname,oldname,projectId} = req.body
+    const projectup = await Projects.findOneAndUpdate({ _id: projectId,groups:{"$elemMatch": { name: oldname }}},{$set: { "groups.$.name": newname }})
+    console.log(projectup)
+    res.send()
+})
+
+//remove notification
+
+router.post('/removenotification',async(req,res)=>{
+    const remove = await Users.findOneAndUpdate({_id:req.body.userId},{$pull:{notification:req.body.message}})
+    res.send()
+})
 //read workspaces
 
 router.post('/readworkspaces', async (req, res) => {
@@ -820,6 +841,18 @@ router.post('/addcustomer', async (req, res) => {
         console.log(err)
         res.send(err)
     }
+})
+
+//admin change
+
+router.post('/adminchange',async(req,res)=>{
+    const {wsId, newadmin} = req.body
+    console.log(wsId._id)
+    console.log(newadmin._id)
+
+    const adminchange =await Workspace.findOneAndUpdate({_id:mongoose.Types.ObjectId(wsId._id)},{$set:{admin:mongoose.Types.ObjectId(newadmin._id)}})
+
+    res.send()
 })
 
 //add project without client
@@ -1042,7 +1075,7 @@ router.post('/isregistered', async (req, res) => {
 router.post('/updateclientdetail', async (req, res) => {
     const { name, location, email, number, website } = req.body
 
-    const update = await Clients.findOneAndUpdate({ _id: req.body._id }, { $set: { name: name, location: location, email: email, website: website, number: number, contacts: contacts } })
+    const update = await Clients.findOneAndUpdate({ _id: req.body._id }, { $set: { name: name, location: location, email: email, website: website, number: number } })
 
     res.send({ message: "Client Details Are Updated" })
 })
@@ -1051,6 +1084,25 @@ router.post('/readclient', async (req, res) => {
     const client = await Clients.findOne({ _id: req.body._id })
 
     res.send(client)
+})
+
+//remove from workspace
+
+router.post('/removefromws',async(req,res)=>{
+    const {email,ws} = req.body
+
+    for(project of ws.projects){
+        const proData = await Projects.findOne({_id:project._id},{members:1})
+        for(member of proData.members){
+            const usermail =await Users.findOne({_id:member},{email:1})
+            if(usermail.email.toString()===email.toString()){
+                res.send({message:"Profile must not be part of any project to remove it from workspace"})
+            }
+        }
+    }
+
+    res.send({message:"Profile removed from the workspace"})
+    
 })
 
 
